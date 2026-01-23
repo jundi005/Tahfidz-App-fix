@@ -1,0 +1,5 @@
+{
+  "name": "Halaqah Attendance System",
+  "description": "A web application for recording Halaqah Al-Quran attendance at Ma'had Al Faruq Assalafy Kalibagor Banyumas. It includes features for daily attendance, data management for students and teachers, Halaqah group management, and detailed reporting with charts and data export capabilities.",
+  "requestFramePermissions": []
+}
