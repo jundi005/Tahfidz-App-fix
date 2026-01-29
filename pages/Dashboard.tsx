@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import Card, { WidgetCard } from '../components/Card';
-import { AttendanceColumnChart } from '../components/Chart';
+import { AttendanceColumnChart, MultiLineChart } from '../components/Chart';
 import { useSupabaseData } from '../hooks/useSupabaseData';
 import { AttendanceStatus, Marhalah } from '../types';
 import { Users, BookOpen, MoreVertical, Download } from 'lucide-react';
@@ -106,6 +106,37 @@ const Dashboard: React.FC = () => {
 
             return stats;
         }).reverse();
+    }, [attendance]);
+
+    // 4. Trend Data (30 Days) - Copied from LaporanRekapPage logic
+    const trendData = useMemo(() => {
+        const endDate = new Date();
+        const startDate = new Date(endDate);
+        startDate.setDate(endDate.getDate() - 30);
+        const days: Record<string, any> = {};
+        
+        // Generate blank days for the last 30 days to ensure continuity
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const strDate = format(d, 'yyyy-MM-dd');
+            days[strDate] = { 
+                date: format(d, 'dd MMM'), 
+                fullDate: strDate,
+                [AttendanceStatus.Hadir]: 0,
+                [AttendanceStatus.Izin]: 0,
+                [AttendanceStatus.Sakit]: 0,
+                [AttendanceStatus.Alpa]: 0,
+                [AttendanceStatus.Terlambat]: 0
+            };
+        }
+
+        // Fill with actual data
+        attendance.forEach(r => {
+            if (days[r.date]) {
+                days[r.date][r.status]++;
+            }
+        });
+
+        return Object.values(days).sort((a: any, b: any) => a.fullDate.localeCompare(b.fullDate));
     }, [attendance]);
 
     // Helper for status colors
@@ -291,6 +322,13 @@ const Dashboard: React.FC = () => {
                     <AttendanceColumnChart data={weeklyAttendanceData} />
                 </div>
             </div>
+          </Card>
+
+          {/* New 30 Days Trend Chart */}
+          <Card title="Tren Kehadiran (30 Hari Terakhir)">
+             <div className="pt-2">
+                <MultiLineChart data={trendData} />
+             </div>
           </Card>
       </div>
     </div>

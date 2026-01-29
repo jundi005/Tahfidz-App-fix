@@ -208,9 +208,9 @@ const HalaqahPage: React.FC = () => {
 
     // Import/Export Logic
     const handleDownloadTemplate = () => {
-        // Added 'id' to headers
-        const headers = ['id', 'no_urut', 'nama_halaqah', 'jenis_halaqah', 'marhalah_halaqah', 'nama_musammi', 'nama_santri', 'marhalah_santri', 'kelas_santri'];
-        const dummy = ['', '1', 'Halaqah 1', 'Halaqah Utama', 'Mutawassithah', 'Ustadz Fulan', 'Santri A', 'Mutawassithah', '1A'];
+        // Added 'musammi_id' and 'santri_id' to headers
+        const headers = ['id_halaqah', 'no_urut', 'nama_halaqah', 'jenis_halaqah', 'marhalah_halaqah', 'musammi_id', 'nama_musammi', 'santri_id', 'nama_santri', 'marhalah_santri', 'kelas_santri'];
+        const dummy = ['', '1', 'Halaqah 1', 'Halaqah Utama', 'Mutawassithah', '101', 'Ustadz Fulan', '205', 'Santri A', 'Mutawassithah', '1A'];
         const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), dummy.join(',')].join('\n');
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -232,22 +232,28 @@ const HalaqahPage: React.FC = () => {
             // 1. Group Data
             // Key determination: Use ID if provided, otherwise Name
             const groupedData: Record<string, {
-                id?: number, // Store ID if present
+                id?: number, // Store Halaqah ID if present
                 no_urut: number,
                 jenis: string,
                 marhalah: string,
+                musammi_id?: number,
                 nama_musammi: string,
                 nama_halaqah: string,
-                santriList: { nama: string, marhalah?: string, kelas?: string }[]
+                santriList: { id?: number, nama: string, marhalah?: string, kelas?: string }[]
             }> = {};
 
             for (const row of csvData) {
                 const namaHalaqah = row.nama_halaqah;
-                const importId = row.id ? parseInt(row.id) : undefined;
+                const importId = row.id_halaqah || row.id ? parseInt(row.id_halaqah || row.id) : undefined;
                 
                 // Allow fallback keys if user uses old template or variations
                 const jenis = row.jenis_halaqah || row.jenis || 'Halaqah Utama';
                 const marhalah = row.marhalah_halaqah || row.marhalah || 'Mutawassithah';
+                
+                // Person IDs
+                const musammiId = row.musammi_id ? parseInt(row.musammi_id) : undefined;
+                const santriId = row.santri_id ? parseInt(row.santri_id) : undefined;
+
                 const musammiName = row.nama_musammi;
                 const santriName = row.nama_santri;
                 const noUrut = row.no_urut ? parseInt(row.no_urut) : 999;
@@ -256,7 +262,7 @@ const HalaqahPage: React.FC = () => {
                 const santriMarhalah = row.marhalah_santri;
                 const santriKelas = row.kelas_santri;
 
-                if (!namaHalaqah || !musammiName) continue;
+                if (!namaHalaqah) continue;
 
                 // Create a unique key for grouping. Use ID prefix if ID exists to avoid name collisions.
                 const groupKey = importId ? `ID:${importId}` : `NAME:${namaHalaqah}`;
@@ -268,13 +274,15 @@ const HalaqahPage: React.FC = () => {
                         no_urut: noUrut,
                         jenis: jenis,
                         marhalah: marhalah,
-                        nama_musammi: musammiName,
+                        musammi_id: musammiId,
+                        nama_musammi: musammiName || 'Unknown',
                         santriList: []
                     };
                 }
                 
                 if (santriName) {
                     groupedData[groupKey].santriList.push({
+                        id: santriId,
                         nama: santriName,
                         marhalah: santriMarhalah,
                         kelas: santriKelas
@@ -284,10 +292,18 @@ const HalaqahPage: React.FC = () => {
 
             // 2. Process Groups
             for (const group of Object.values(groupedData)) {
-                // A. Find Musammi
-                const targetMusammi = musammi.find(m => m.nama.toLowerCase() === group.nama_musammi.toLowerCase());
+                // A. Find Musammi (Priority: ID -> Name)
+                let targetMusammi;
+                if (group.musammi_id) {
+                    targetMusammi = musammi.find(m => m.id === group.musammi_id);
+                }
+                
+                if (!targetMusammi && group.nama_musammi) {
+                    targetMusammi = musammi.find(m => m.nama.toLowerCase() === group.nama_musammi.toLowerCase());
+                }
+
                 if (!targetMusammi) {
-                    errors.push(`Musammi tidak ditemukan: ${group.nama_musammi} (Halaqah: ${group.nama_halaqah})`);
+                    errors.push(`Musammi tidak ditemukan (ID: ${group.musammi_id || '-'}, Nama: ${group.nama_musammi}) di Halaqah: ${group.nama_halaqah}`);
                     continue;
                 }
 
@@ -312,14 +328,10 @@ const HalaqahPage: React.FC = () => {
                         
                         if (!upError) updatedHalaqahCount++;
                     } else {
-                        // ID provided but not found? Usually means we can't force insert ID easily in Supabase unless identity insert is ON.
-                        // We will fallback to creating new with auto-ID but warn, OR treat as new.
-                        // For this app, let's treat as New (Ignore provided ID) or try finding by Name.
-                        
+                        // Fallback: If ID not found, try Name or Create New
                         const existingByName = halaqah.find(h => h.nama.toLowerCase() === group.nama_halaqah.toLowerCase());
                         if (existingByName) {
                              targetHalaqahId = existingByName.id;
-                             // Update existing found by name
                              await supabase.from('halaqah').update({
                                 musammi_id: targetMusammi.id,
                                 marhalah: group.marhalah as Marhalah,
@@ -387,15 +399,24 @@ const HalaqahPage: React.FC = () => {
                 if (targetHalaqahId && group.santriList.length > 0) {
                     const santriToInsert = [];
                     for (const sData of group.santriList) {
-                        // Find Santri: Try exact match including Class/Marhalah first, fallback to Name only
-                        let targetSantri = santri.find(s => {
-                            const nameMatch = s.nama.toLowerCase() === sData.nama.toLowerCase();
-                            const classMatch = sData.kelas ? s.kelas.toLowerCase() === sData.kelas.toLowerCase() : true;
-                            const marhalahMatch = sData.marhalah ? s.marhalah.toLowerCase() === sData.marhalah.toLowerCase() : true;
-                            return nameMatch && classMatch && marhalahMatch;
-                        });
+                        let targetSantri;
 
-                        // Fallback: Name only match if specific match failed
+                        // 1. Try Find by ID
+                        if (sData.id) {
+                            targetSantri = santri.find(s => s.id === sData.id);
+                        }
+
+                        // 2. Fallback: Find by Name (+ Class/Marhalah if available)
+                        if (!targetSantri) {
+                            targetSantri = santri.find(s => {
+                                const nameMatch = s.nama.toLowerCase() === sData.nama.toLowerCase();
+                                const classMatch = sData.kelas ? s.kelas.toLowerCase() === sData.kelas.toLowerCase() : true;
+                                const marhalahMatch = sData.marhalah ? s.marhalah.toLowerCase() === sData.marhalah.toLowerCase() : true;
+                                return nameMatch && classMatch && marhalahMatch;
+                            });
+                        }
+
+                        // 3. Fallback: Name only
                         if (!targetSantri) {
                             targetSantri = santri.find(s => s.nama.toLowerCase() === sData.nama.toLowerCase());
                         }
@@ -438,6 +459,7 @@ const HalaqahPage: React.FC = () => {
                 'Jenis': h.jenis,
                 'Marhalah': h.marhalah,
                 'Peran': 'Musammi',
+                'Person ID': h.musammi.id, // Explicit ID for re-import
                 'Nama Anggota': h.musammi.nama,
                 'Kelas': '-',
                 'Kode': h.musammi.kode || '-'
@@ -450,6 +472,7 @@ const HalaqahPage: React.FC = () => {
                     'Jenis': h.jenis,
                     'Marhalah': h.marhalah,
                     'Peran': 'Santri',
+                    'Person ID': s.id, // Explicit ID for re-import
                     'Nama Anggota': s.nama,
                     'Kelas': s.kelas,
                     'Kode': s.kode || '-'
@@ -463,8 +486,8 @@ const HalaqahPage: React.FC = () => {
     
     const handleExportPDF = () => {
         const data = getDetailedExportData();
-        const columns = ['ID', 'Nama Halaqah', 'Peran', 'Nama Anggota', 'Kelas'];
-        const rows = data.map(d => [d['ID'], d['Nama Halaqah'], d['Peran'], d['Nama Anggota'], d['Kelas']]);
+        const columns = ['ID', 'Nama Halaqah', 'Peran', 'Person ID', 'Nama Anggota', 'Kelas'];
+        const rows = data.map(d => [d['ID'], d['Nama Halaqah'], d['Peran'], d['Person ID'], d['Nama Anggota'], d['Kelas']]);
         exportToPDF("Data Halaqah Lengkap", columns, rows, "Data_Halaqah_Lengkap");
     };
 
@@ -503,6 +526,7 @@ const HalaqahPage: React.FC = () => {
                         <table className="w-full text-sm text-left text-slate-500">
                             <thead className="text-xs text-slate-700 uppercase bg-slate-100 border-b border-slate-200">
                                 <tr>
+                                    <th className="px-6 py-3 font-bold tracking-wider">ID</th>
                                     <th className="px-6 py-3 font-bold tracking-wider">Nama Santri</th>
                                     <th className="px-6 py-3 font-bold tracking-wider">Kelas</th>
                                     <th className="px-6 py-3 font-bold tracking-wider">Aksi</th>
@@ -511,12 +535,13 @@ const HalaqahPage: React.FC = () => {
                             <tbody>
                                 {selectedHalaqah.santri.sort((a,b) => a.nama.localeCompare(b.nama)).map(s => (
                                     <tr key={s.id} className="bg-white border-b hover:bg-slate-50">
+                                        <td className="px-6 py-4 font-mono text-xs text-slate-500">#{s.id}</td>
                                         <td className="px-6 py-4 font-medium text-slate-900">{s.nama}</td>
                                         <td className="px-6 py-4">{s.kelas}</td>
                                         <td className="px-6 py-4"><button onClick={async () => { if(confirm("Hapus anggota dari halaqah ini?")) await removeSantriFromHalaqah(selectedHalaqah.id, s.id) }} className="text-error hover:bg-red-50 p-1 rounded"><Trash size={16}/></button></td>
                                     </tr>
                                 ))}
-                                {selectedHalaqah.santri.length === 0 && <tr><td colSpan={3} className="text-center py-8">Belum ada anggota.</td></tr>}
+                                {selectedHalaqah.santri.length === 0 && <tr><td colSpan={4} className="text-center py-8">Belum ada anggota.</td></tr>}
                             </tbody>
                         </table>
                     </div>
