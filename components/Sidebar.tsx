@@ -29,7 +29,8 @@ interface NavItemConfig {
 
 const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, isOpen, setOpen, isCollapsed, isSuperAdmin }) => {
   // State to track expanded menus (array of IDs)
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['data', 'laporan', 'akademik']);
+  // UPDATED: Default is empty array so all submenus are collapsed initially
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
 
   // Handle toggling sub-menus
   const toggleMenu = (id: string) => {
