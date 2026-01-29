@@ -4,7 +4,7 @@ import type { Page } from '../types';
 import { 
   Home, CheckSquare, Users, BookOpen, BarChart2, X, Megaphone, 
   Book, TrendingUp, ShieldCheck, User, ChevronDown, ChevronRight,
-  Database, FileText, Circle
+  Database, FileText, Circle, ClipboardList
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -29,7 +29,7 @@ interface NavItemConfig {
 
 const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, isOpen, setOpen, isCollapsed, isSuperAdmin }) => {
   // State to track expanded menus (array of IDs)
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['data', 'laporan']);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['data', 'laporan', 'akademik']);
 
   // Handle toggling sub-menus
   const toggleMenu = (id: string) => {
@@ -70,17 +70,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, isOpen, setOpen
         { id: 'data_wali_santri', label: 'Data Wali Santri', icon: <Circle size={8} />, page: 'DataWaliSantri' },
       ]
     },
-    { 
-      id: 'perkembangan', 
-      label: 'Perkembangan', 
-      icon: <TrendingUp size={20} />, 
-      page: 'Perkembangan Santri' 
-    },
-    { 
-      id: 'laporan_wali', 
-      label: 'Laporan ke Wali', 
-      icon: <User size={20} />, 
-      page: 'Wali Santri' 
+    {
+        id: 'akademik',
+        label: 'Akademik',
+        icon: <TrendingUp size={20} />,
+        children: [
+            { id: 'perkembangan', label: 'Perkembangan', icon: <Circle size={8} />, page: 'Perkembangan Santri' },
+            { id: 'evaluasi', label: 'Evaluasi Bulanan', icon: <Circle size={8} />, page: 'EvaluasiSantri' },
+        ]
     },
     { 
       id: 'informasi', 

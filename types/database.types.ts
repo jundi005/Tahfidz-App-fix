@@ -1,5 +1,4 @@
 
-
 export type Json =
   | string
   | number
@@ -118,6 +117,84 @@ export type Database = {
           },
         ]
       }
+      student_evaluation: {
+        Row: {
+          id: number
+          organization_id: string
+          created_at: string
+          santri_id: number
+          month_key: string
+          kualitas_hafalan: string | null
+          kualitas_bacaan: string | null
+          sikap_prilaku: string | null
+          catatan_musammi: string | null
+          catatan_muroqib: string | null
+          catatan_lajnah: string | null
+        }
+        Insert: {
+          id?: number
+          organization_id: string
+          created_at?: string
+          santri_id: number
+          month_key: string
+          kualitas_hafalan?: string | null
+          kualitas_bacaan?: string | null
+          sikap_prilaku?: string | null
+          catatan_musammi?: string | null
+          catatan_muroqib?: string | null
+          catatan_lajnah?: string | null
+        }
+        Update: {
+          id?: number
+          organization_id?: string
+          created_at?: string
+          santri_id?: number
+          month_key?: string
+          kualitas_hafalan?: string | null
+          kualitas_bacaan?: string | null
+          sikap_prilaku?: string | null
+          catatan_musammi?: string | null
+          catatan_muroqib?: string | null
+          catatan_lajnah?: string | null
+        }
+        Relationships: [
+            {
+                foreignKeyName: "student_evaluation_santri_id_fkey"
+                columns: ["santri_id"]
+                isOneToOne: false
+                referencedRelation: "santri"
+                referencedColumns: ["id"]
+            }
+        ]
+      }
+      evaluation_settings: {
+        Row: {
+          id: number
+          organization_id: string
+          created_at: string
+          category: string
+          label: string
+          score: number | null
+        }
+        Insert: {
+          id?: number
+          organization_id: string
+          created_at?: string
+          category: string
+          label: string
+          score?: number | null
+        }
+        Update: {
+          id?: number
+          organization_id?: string
+          created_at?: string
+          category?: string
+          label?: string
+          score?: number | null
+        }
+        Relationships: []
+      }
+      // ... (Existing tables omitted for brevity but remain unchanged) ...
       chat: {
         Row: {
           id: number
@@ -155,6 +232,7 @@ export type Database = {
           musammi_id: number | null
           nama: string
           waktu: Database["public"]["Enums"]["waktu_enum"][]
+          no_urut: number
         }
         Insert: {
           id?: number
@@ -165,6 +243,7 @@ export type Database = {
           musammi_id?: number | null
           nama: string
           waktu: Database["public"]["Enums"]["waktu_enum"][]
+          no_urut?: number
         }
         Update: {
           id?: number
@@ -175,6 +254,7 @@ export type Database = {
           musammi_id?: number | null
           nama?: string
           waktu?: Database["public"]["Enums"]["waktu_enum"][]
+          no_urut?: number
         }
         Relationships: [
           {

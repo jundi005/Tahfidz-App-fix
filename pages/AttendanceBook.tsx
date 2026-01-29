@@ -50,8 +50,21 @@ const AttendanceBook: React.FC = () => {
             if (selectedMarhalah !== 'all' && h.marhalah !== selectedMarhalah) return false;
             return true;
         }).sort((a, b) => {
-            // Sort by Marhalah first, then Name
-            if (a.marhalah !== b.marhalah) return a.marhalah.localeCompare(b.marhalah);
+            // Sort: No Urut (Primary) -> Jenis -> Marhalah -> Nama
+            
+            // 1. No Urut
+            if ((a.no_urut || 999) !== (b.no_urut || 999)) return (a.no_urut || 999) - (b.no_urut || 999);
+
+            // 2. Jenis
+            if (a.jenis !== b.jenis) return a.jenis.localeCompare(b.jenis);
+
+            // 3. Marhalah
+            const marhalahOrder = ALL_MARHALAH;
+            const mIdxA = marhalahOrder.indexOf(a.marhalah);
+            const mIdxB = marhalahOrder.indexOf(b.marhalah);
+            if (mIdxA !== mIdxB) return mIdxA - mIdxB;
+
+            // 4. Nama
             return a.nama.localeCompare(b.nama);
         });
     }, [halaqah, selectedType, selectedMarhalah]);
@@ -169,22 +182,21 @@ const AttendanceBook: React.FC = () => {
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(0, 0, 0);
                 
-                // Header Bar (Light Gray)
+                // Header Bar (Light Gray) - Simplified
                 doc.setFillColor(240, 240, 240);
-                doc.rect(14, cursorY, 182, 8, 'F');
+                doc.rect(14, cursorY, 182, 7, 'F');
                 
-                doc.text(`${index + 1}. ${h.nama}`, 16, cursorY + 5.5);
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(9);
-                doc.text(`Musammi': ${h.musammi.nama}`, 90, cursorY + 5.5);
-                doc.text(`(${h.marhalah})`, 170, cursorY + 5.5);
-
-                cursorY += 9; // Spacing after header
+                // Only show Name and Number (sorted number if available)
+                // Use actual index in filtered list for display number if no_urut not set
+                const displayNumber = h.no_urut || (index + 1);
+                doc.text(`${displayNumber}. ${h.nama}`, 16, cursorY + 5);
+                
+                cursorY += 8; // Reduced Spacing after header
 
                 // --- Table Construction ---
                 const headRow1: any[] = [
                     { content: 'No', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-                    { content: 'Nama Santri (Kelas)', rowSpan: 2, styles: { halign: 'left', valign: 'middle' } }
+                    { content: 'Nama (Kelas)', rowSpan: 2, styles: { halign: 'left', valign: 'middle' } }
                 ];
                 const headRow2: any[] = [];
 
@@ -201,10 +213,24 @@ const AttendanceBook: React.FC = () => {
                     });
                 });
 
-                const body = h.santri.sort((a,b) => a.nama.localeCompare(b.nama)).map((s, i) => {
-                    const checkCells = Array(activeDates.length * colsPerDay).fill('');
+                // --- ROW DATA CONSTRUCTION ---
+                // Helper for empty check cells
+                const checkCells = Array(activeDates.length * colsPerDay).fill('');
+
+                // 1. Musammi Row (Distinct Style, No Suffix)
+                const musammiRow = [
+                    { content: 'M', styles: { halign: 'center', fontStyle: 'bold', fillColor: [240, 248, 255] } },
+                    { content: h.musammi.nama, styles: { fontStyle: 'bold', fillColor: [240, 248, 255] } },
+                    ...checkCells.map(() => ({ content: '', styles: { fillColor: [240, 248, 255] } }))
+                ];
+
+                // 2. Santri Rows
+                const santriRows = h.santri.sort((a,b) => a.nama.localeCompare(b.nama)).map((s, i) => {
                     return [i + 1, `${s.nama} (${s.kelas})`, ...checkCells];
                 });
+
+                // Combine them: Musammi first, then Santri
+                const body = [musammiRow, ...santriRows];
 
                 autoTable(doc, {
                     startY: cursorY,
@@ -212,8 +238,8 @@ const AttendanceBook: React.FC = () => {
                     body: body,
                     theme: 'grid',
                     styles: { 
-                        fontSize: 9, // Standard readable font
-                        cellPadding: 1.5, // More padding since we have fewer items per page
+                        fontSize: 9, 
+                        cellPadding: 1.5,
                         lineColor: [100, 100, 100],
                         lineWidth: 0.1,
                         textColor: 0,
@@ -238,8 +264,8 @@ const AttendanceBook: React.FC = () => {
                 // Update cursor based on table end
                 const finalY = (doc as any).lastAutoTable.finalY;
                 
-                // Add fixed spacing for the next item
-                cursorY = finalY + 15; 
+                // Reduce spacing for the next item (closer tables)
+                cursorY = finalY + 8; 
                 itemsOnPage++;
             });
         } // End Week Loop

@@ -1,14 +1,32 @@
-import React, { useMemo } from 'react';
+
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import Card, { WidgetCard } from '../components/Card';
 import { AttendanceColumnChart } from '../components/Chart';
 import { useSupabaseData } from '../hooks/useSupabaseData';
 import { AttendanceStatus, Marhalah } from '../types';
-import { Users, BookOpen } from 'lucide-react';
+import { Users, BookOpen, MoreVertical, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { ALL_MARHALAH, ALL_ATTENDANCE_STATUS } from '../constants';
+import html2canvas from 'html2canvas';
 
 const Dashboard: React.FC = () => {
     const { santri, musammi, halaqah, attendance, loading, error } = useSupabaseData();
+    
+    // Chart Menu State
+    const [isChartMenuOpen, setIsChartMenuOpen] = useState(false);
+    const chartRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Close menu on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsChartMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // --- Data Calculations ---
     
@@ -18,11 +36,33 @@ const Dashboard: React.FC = () => {
         return acc;
     }, {} as Record<Marhalah, number>), [santri]);
 
-    // 2. Today's Attendance Statistics by Marhalah
+    // 2. Statistics Logic (With Fallback Date)
     const todayString = format(new Date(), 'yyyy-MM-dd');
     
+    const displayDateInfo = useMemo(() => {
+        // Check if we have data for today
+        const hasTodayData = attendance.some(a => a.date === todayString);
+        
+        if (hasTodayData) {
+            return { date: todayString, isToday: true };
+        }
+
+        // If no data today, find the latest date with data
+        const sortedDates = Array.from(new Set(attendance.map(a => a.date)))
+            .sort((a: string, b: string) => b.localeCompare(a)); // Descending sort (newest first)
+        
+        if (sortedDates.length > 0) {
+            return { date: sortedDates[0], isToday: false };
+        }
+
+        // Default to today if database empty
+        return { date: todayString, isToday: true };
+    }, [attendance, todayString]);
+
+    
     const todaysStats = useMemo(() => {
-        const todaysAttendance = attendance.filter(a => a.date === todayString);
+        const targetDate = displayDateInfo.date;
+        const targetAttendance = attendance.filter(a => a.date === targetDate);
         
         // Initialize structure
         const stats: Record<string, Record<AttendanceStatus, number>> = {};
@@ -39,17 +79,19 @@ const Dashboard: React.FC = () => {
         });
 
         // Populate counts
-        todaysAttendance.forEach(record => {
+        targetAttendance.forEach(record => {
             if (stats[record.marhalah] && stats[record.marhalah][record.status] !== undefined) {
                 stats[record.marhalah][record.status]++;
             }
         });
 
         return stats;
-    }, [attendance, todayString]);
+    }, [attendance, displayDateInfo]);
 
     // 3. Weekly Attendance Stacked Bar Chart Data
     const weeklyAttendanceData = useMemo(() => {
+        // Calculate based on the LAST 7 DAYS from Today (regardless of data availability to show real trend)
+        // Or if you prefer relative to the last data point, logic would differ. Usually trends show current week.
         return Array.from({ length: 7 }).map((_, i) => {
             const date = new Date();
             date.setDate(date.getDate() - i);
@@ -75,6 +117,21 @@ const Dashboard: React.FC = () => {
             case AttendanceStatus.Alpa: return 'bg-red-50 text-red-700 border-red-200';
             case AttendanceStatus.Terlambat: return 'bg-orange-50 text-orange-700 border-orange-200';
             default: return 'bg-slate-50 text-slate-700';
+        }
+    };
+
+    const handleDownloadChart = async () => {
+        if (chartRef.current) {
+            try {
+                const canvas = await html2canvas(chartRef.current, { scale: 2, backgroundColor: '#ffffff' });
+                const link = document.createElement('a');
+                link.download = `Tren_Kehadiran_${format(new Date(), 'yyyy-MM-dd')}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+                setIsChartMenuOpen(false);
+            } catch (err) {
+                console.error("Failed to download chart", err);
+            }
         }
     };
 
@@ -136,9 +193,11 @@ const Dashboard: React.FC = () => {
       </div>
       
       <div className="grid grid-cols-1 gap-6">
-          <Card title="Statistik Absensi Hari Ini">
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-center border-collapse">
+          <Card 
+            title={displayDateInfo.isToday ? "Statistik Absensi Hari Ini" : "Statistik Absensi Terakhir"}
+          >
+            <div className="overflow-x-auto pb-2">
+                <table className="w-full text-sm text-center border-collapse whitespace-nowrap">
                     <thead>
                         <tr>
                             <th className="p-3 text-left font-semibold text-slate-600 border-b border-slate-200">Marhalah</th>
@@ -196,11 +255,42 @@ const Dashboard: React.FC = () => {
                     </tbody>
                 </table>
             </div>
-            <p className="text-xs text-slate-400 mt-4 text-right">*Data berdasarkan absensi tanggal {todayString}</p>
+            <p className="text-xs text-slate-400 mt-4 text-right">
+                {displayDateInfo.isToday 
+                    ? `*Data berdasarkan absensi hari ini (${displayDateInfo.date})`
+                    : `*Data hari ini kosong. Menampilkan data tanggal: ${displayDateInfo.date}`
+                }
+            </p>
           </Card>
 
-          <Card title="Tren Kehadiran Seminggu Terakhir">
-            <AttendanceColumnChart data={weeklyAttendanceData} />
+          <Card className="relative">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center -mx-6 -mt-6 mb-4 rounded-t-xl bg-primary">
+                <h2 className="text-lg font-semibold text-slate-800">Tren Kehadiran Seminggu Terakhir</h2>
+                <div className="relative" ref={menuRef}>
+                    <button 
+                        onClick={() => setIsChartMenuOpen(!isChartMenuOpen)}
+                        className="p-1 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"
+                    >
+                        <MoreVertical size={20}/>
+                    </button>
+                    {isChartMenuOpen && (
+                        <div className="absolute right-0 top-8 w-40 bg-white shadow-lg border border-slate-200 rounded-lg z-10 py-1 text-sm animate-in fade-in zoom-in-95 duration-100">
+                            <button 
+                                onClick={handleDownloadChart}
+                                className="flex items-center w-full px-4 py-2 text-left hover:bg-slate-50 text-slate-700"
+                            >
+                                <Download size={14} className="mr-2"/> Download PNG
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+            
+            <div className="overflow-x-auto pb-4" ref={chartRef}>
+                <div className="min-w-[500px]">
+                    <AttendanceColumnChart data={weeklyAttendanceData} />
+                </div>
+            </div>
           </Card>
       </div>
     </div>

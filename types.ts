@@ -76,6 +76,7 @@ export interface Halaqah {
   marhalah: Marhalah;
   jenis: HalaqahType;
   waktu: Waktu[];
+  no_urut: number;
 }
 
 export interface AttendanceRecord {
@@ -101,6 +102,25 @@ export interface StudentProgress {
     value: string;
 }
 
+export interface EvaluationSetting {
+    id: number;
+    category: 'Hafalan' | 'Bacaan' | 'Sikap';
+    label: string;
+    score?: number;
+}
+
+export interface StudentEvaluation {
+    id: number;
+    santri_id: number;
+    month_key: string;
+    kualitas_hafalan?: string;
+    kualitas_bacaan?: string;
+    sikap_prilaku?: string;
+    catatan_musammi?: string;
+    catatan_muroqib?: string;
+    catatan_lajnah?: string;
+}
+
 // UPDATE: Added sub-pages for Sidebar navigation
 export type Page = 
   | 'Dashboard' 
@@ -112,7 +132,9 @@ export type Page =
   | 'DataHalaqah' 
   | 'DataWaliKelas' 
   | 'DataWaliSantri'
+  | 'Akademik' // Parent
   | 'Perkembangan Santri' 
+  | 'EvaluasiSantri' // UPDATED: Removed space
   | 'Wali Santri' 
   | 'Pusat Informasi' 
   | 'Laporan' // Parent (Optional use)
