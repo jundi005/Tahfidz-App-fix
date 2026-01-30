@@ -153,14 +153,13 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
       <XAxis 
         dataKey="name" 
         interval={0} 
-        angle={rotateLabels ? -45 : 0}  
-        textAnchor={rotateLabels ? "end" : "middle"}
-        height={bottomMargin}
-        tick={{fontSize: 12, fill: '#475569', fontWeight: 600}}
+        angle={-45} 
+        height={120} 
+        tick={{fontSize: 11, fill: '#475569', fontWeight: 600, textAnchor: "end"}}
         axisLine={false}
         tickLine={false}
-        dx={rotateLabels ? -5 : 0} 
-        dy={10}
+        //dx={-8} 
+        //dy={10}
       />
       <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
       <Tooltip 
