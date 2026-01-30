@@ -3,8 +3,8 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import Card, { WidgetCard } from '../components/Card';
 import { AttendanceColumnChart, MultiLineChart } from '../components/Chart';
 import { useSupabaseData } from '../hooks/useSupabaseData';
-import { AttendanceStatus, Marhalah } from '../types';
-import { Users, BookOpen, MoreVertical, Download } from 'lucide-react';
+import { AttendanceStatus, Marhalah, Waktu } from '../types';
+import { Users, BookOpen, MoreVertical, Download, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ALL_MARHALAH, ALL_ATTENDANCE_STATUS } from '../constants';
 import html2canvas from 'html2canvas';
@@ -35,6 +35,37 @@ const Dashboard: React.FC = () => {
         acc[s.marhalah] = (acc[s.marhalah] || 0) + 1;
         return acc;
     }, {} as Record<Marhalah, number>), [santri]);
+
+    // New: Calculate Actual Executed Sessions based on Attendance Data
+    // Menghitung jumlah sesi unik (Tanggal + Waktu) yang sudah tersimpan di database absensi
+    const waktuStats = useMemo(() => {
+        const uniqueSessions = new Set<string>();
+        const breakdown = {
+            [Waktu.Shubuh]: new Set<string>(),
+            [Waktu.Dhuha]: new Set<string>(),
+            [Waktu.Ashar]: new Set<string>(),
+            [Waktu.Isya]: new Set<string>(),
+        };
+
+        attendance.forEach(record => {
+            // Create a unique key for the session: "YYYY-MM-DD_Waktu"
+            const sessionKey = `${record.date}_${record.waktu}`;
+            uniqueSessions.add(sessionKey);
+
+            // Also track unique dates per specific Waktu to count how many times each Waktu occurred
+            if (breakdown[record.waktu]) {
+                breakdown[record.waktu].add(record.date);
+            }
+        });
+
+        return {
+            total: uniqueSessions.size,
+            [Waktu.Shubuh]: breakdown[Waktu.Shubuh].size,
+            [Waktu.Dhuha]: breakdown[Waktu.Dhuha].size,
+            [Waktu.Ashar]: breakdown[Waktu.Ashar].size,
+            [Waktu.Isya]: breakdown[Waktu.Isya].size,
+        };
+    }, [attendance]);
 
     // 2. Statistics Logic (With Fallback Date)
     const todayString = format(new Date(), 'yyyy-MM-dd');
@@ -108,7 +139,7 @@ const Dashboard: React.FC = () => {
         }).reverse();
     }, [attendance]);
 
-    // 4. Trend Data (30 Days) - Copied from LaporanRekapPage logic
+    // 4. Trend Data (30 Days) - Filtered to exclude Friday (Jumat)
     const trendData = useMemo(() => {
         const endDate = new Date();
         const startDate = new Date(endDate);
@@ -117,6 +148,9 @@ const Dashboard: React.FC = () => {
         
         // Generate blank days for the last 30 days to ensure continuity
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            // SKIP FRIDAY (Day 5)
+            if (d.getDay() === 5) continue;
+
             const strDate = format(d, 'yyyy-MM-dd');
             days[strDate] = { 
                 date: format(d, 'dd MMM'), 
@@ -131,6 +165,7 @@ const Dashboard: React.FC = () => {
 
         // Fill with actual data
         attendance.forEach(r => {
+            // Only add data if the date exists in our map (which excludes Fridays)
             if (days[r.date]) {
                 days[r.date][r.status]++;
             }
@@ -180,7 +215,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6">
         <WidgetCard className="flex flex-col justify-between">
             <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-slate-500">Total Santri</p>
@@ -219,6 +254,23 @@ const Dashboard: React.FC = () => {
              <div>
                 <p className="text-3xl font-bold mt-2">{halaqah.length}</p>
                 <p className="text-xs text-slate-400 mt-2">Kelompok belajar</p>
+             </div>
+        </WidgetCard>
+        <WidgetCard className="flex flex-col justify-between">
+             <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-500">Sesi Berjalan (Total)</p>
+                 <div className="p-2 bg-green-100 rounded-lg">
+                    <Clock className="text-green-600" size={20}/>
+                 </div>
+            </div>
+             <div>
+                <p className="text-3xl font-bold mt-2">{waktuStats.total}</p>
+                <div className="mt-2 text-xs text-slate-500 grid grid-cols-2 gap-x-2 gap-y-0.5">
+                    <p>Shubuh: <span className="font-semibold text-slate-600">{waktuStats[Waktu.Shubuh]}</span></p>
+                    <p>Dhuha: <span className="font-semibold text-slate-600">{waktuStats[Waktu.Dhuha]}</span></p>
+                    <p>Ashar: <span className="font-semibold text-slate-600">{waktuStats[Waktu.Ashar]}</span></p>
+                    <p>Isya: <span className="font-semibold text-slate-600">{waktuStats[Waktu.Isya]}</span></p>
+                </div>
              </div>
         </WidgetCard>
       </div>

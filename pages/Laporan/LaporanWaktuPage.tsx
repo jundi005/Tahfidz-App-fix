@@ -1,17 +1,21 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import Card from '../../components/Card';
+import Modal from '../../components/Modal';
 import { useSupabaseData } from '../../hooks/useSupabaseData';
 import { StackedBarChart } from '../../components/Chart';
 import { exportToExcel } from '../../lib/utils';
-import { ALL_WAKTU } from '../../constants';
-import { Trash, Download, Filter, MoreVertical } from 'lucide-react';
+import { ALL_WAKTU, ALL_MARHALAH, ALL_ATTENDANCE_STATUS } from '../../constants';
+import { Trash, Download, Filter, MoreVertical, Eye } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 const LaporanWaktuPage: React.FC = () => {
     const { attendance, deleteAttendanceBatch, loading, error } = useSupabaseData();
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
     
+    // Detail Modal State
+    const [selectedSession, setSelectedSession] = useState<{date: string, waktu: string} | null>(null);
+
     // Chart Menu
     const [isChartMenuOpen, setIsChartMenuOpen] = useState(false);
     const chartMenuRef = useRef<HTMLDivElement>(null);
@@ -56,6 +60,40 @@ const LaporanWaktuPage: React.FC = () => {
         return Object.values(groups).sort((a: any, b: any) => b.date.localeCompare(a.date));
     }, [filteredData]);
 
+    // Data for Session Breakdown Modal
+    const sessionDetailData = useMemo(() => {
+        if (!selectedSession) return [];
+        
+        const sessionAttendance = attendance.filter(a => a.date === selectedSession.date && a.waktu === selectedSession.waktu);
+        
+        const classGroups: Record<string, any> = {};
+        
+        sessionAttendance.forEach(r => {
+            const key = `${r.marhalah}-${r.kelas}`;
+            if (!classGroups[key]) {
+                classGroups[key] = {
+                    kelas: r.kelas,
+                    marhalah: r.marhalah,
+                    Hadir: 0, Izin: 0, Sakit: 0, Terlambat: 0, Alpa: 0, Total: 0
+                };
+            }
+            
+            if (r.status === 'Hadir') classGroups[key].Hadir++;
+            else if (r.status === 'Izin') classGroups[key].Izin++;
+            else if (r.status === 'Sakit') classGroups[key].Sakit++;
+            else if (r.status === 'Terlambat') classGroups[key].Terlambat++;
+            else if (r.status === 'Alpa') classGroups[key].Alpa++;
+            classGroups[key].Total++;
+        });
+
+        return Object.values(classGroups).sort((a: any, b: any) => {
+            const mIdxA = ALL_MARHALAH.indexOf(a.marhalah);
+            const mIdxB = ALL_MARHALAH.indexOf(b.marhalah);
+            if (mIdxA !== mIdxB) return mIdxA - mIdxB;
+            return a.kelas.localeCompare(b.kelas, undefined, { numeric: true });
+        });
+    }, [attendance, selectedSession]);
+
     const globalTimeData = useMemo(() => {
         const groups: Record<string, any> = {};
         ALL_WAKTU.forEach(w => { groups[w] = { name: w, Hadir: 0, Sakit: 0, Izin: 0, Alpa: 0, Terlambat: 0 }; });
@@ -63,7 +101,8 @@ const LaporanWaktuPage: React.FC = () => {
         return Object.values(groups);
     }, [filteredData]);
 
-    const handleDeleteTimeRecap = async (date: string, waktu: string) => {
+    const handleDeleteTimeRecap = async (e: React.MouseEvent, date: string, waktu: string) => {
+        e.stopPropagation();
         if (confirm(`Hapus SEMUA data absensi ${date} - ${waktu}?`)) {
             await deleteAttendanceBatch(date, waktu);
         }
@@ -120,8 +159,16 @@ const LaporanWaktuPage: React.FC = () => {
                         </thead>
                         <tbody>
                             {timeRecapData.map((item: any, idx: number) => (
-                                <tr key={idx} className="border-b hover:bg-slate-50">
-                                    <td className="px-6 py-4 font-medium text-slate-900">{item.date}</td>
+                                <tr 
+                                    key={idx} 
+                                    className="border-b hover:bg-blue-50 cursor-pointer transition-colors"
+                                    onClick={() => setSelectedSession({ date: item.date, waktu: item.waktu })}
+                                    title="Klik untuk lihat detail per kelas"
+                                >
+                                    <td className="px-6 py-4 font-medium text-slate-900 flex items-center">
+                                        <Eye size={14} className="mr-2 text-slate-400" />
+                                        {item.date}
+                                    </td>
                                     <td className="px-6 py-4"><span className="px-2 py-1 rounded bg-slate-200 text-slate-700 text-xs font-bold uppercase">{item.waktu}</span></td>
                                     <td className="px-6 py-4 text-center text-green-600 font-bold">{item.Hadir}</td>
                                     <td className="px-6 py-4 text-center text-blue-600">{item.Izin}</td>
@@ -130,7 +177,7 @@ const LaporanWaktuPage: React.FC = () => {
                                     <td className="px-6 py-4 text-center text-orange-600">{item.Terlambat}</td>
                                     <td className="px-6 py-4 text-center font-bold bg-slate-50">{item.Total}</td>
                                     <td className="px-6 py-4 text-right">
-                                        <button onClick={() => handleDeleteTimeRecap(item.date, item.waktu)} className="text-slate-400 hover:text-error p-1 hover:bg-red-50 rounded transition-colors"><Trash size={16}/></button>
+                                        <button onClick={(e) => handleDeleteTimeRecap(e, item.date, item.waktu)} className="text-slate-400 hover:text-error p-1 hover:bg-red-50 rounded transition-colors"><Trash size={16}/></button>
                                     </td>
                                 </tr>
                             ))}
@@ -138,6 +185,7 @@ const LaporanWaktuPage: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                <p className="text-xs text-slate-400 mt-2 italic">*Klik baris untuk melihat detail absensi per kelas pada sesi tersebut.</p>
             </Card>
 
             <Card title="Grafik Total Absensi Per Sesi (Global)">
@@ -147,10 +195,65 @@ const LaporanWaktuPage: React.FC = () => {
                         {isChartMenuOpen && <div className="absolute right-0 w-32 bg-white shadow border rounded p-1 z-20"><button onClick={handleDownloadChart} className="text-left w-full px-3 py-2 text-xs hover:bg-slate-50 flex items-center"><Download size={12} className="mr-2"/> Download PNG</button></div>}
                     </div>
                     <div ref={chartRef}>
-                        <StackedBarChart data={globalTimeData} />
+                        {/* Menggunakan props baru untuk chart yang lebih ramping */}
+                        <StackedBarChart 
+                            data={globalTimeData} 
+                            height={350} 
+                            bottomMargin={30} 
+                            rotateLabels={false} 
+                        />
                     </div>
                 </div>
             </Card>
+
+            {/* MODAL DETAIL PER KELAS */}
+            <Modal isOpen={!!selectedSession} onClose={() => setSelectedSession(null)} title={`Detail Absensi: ${selectedSession?.date} (${selectedSession?.waktu})`}>
+                <div className="max-h-[60vh] overflow-y-auto">
+                    <table className="w-full text-sm text-left text-slate-500">
+                        <thead className="bg-slate-50 uppercase text-xs sticky top-0 border-b border-slate-200">
+                            <tr>
+                                <th className="px-4 py-2">Kelas</th>
+                                <th className="px-4 py-2 text-center text-green-600">Hadir</th>
+                                <th className="px-4 py-2 text-center text-blue-600">Izin</th>
+                                <th className="px-4 py-2 text-center text-yellow-600">Sakit</th>
+                                <th className="px-4 py-2 text-center text-red-600">Alpa</th>
+                                <th className="px-4 py-2 text-center text-orange-600">Telat</th>
+                                <th className="px-4 py-2 text-center font-bold">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sessionDetailData.map((cls, idx) => (
+                                <tr key={idx} className="border-b hover:bg-slate-50">
+                                    <td className="px-4 py-2 font-medium text-slate-900">{cls.kelas} <span className="text-[10px] text-slate-400 font-normal">({cls.marhalah})</span></td>
+                                    <td className="px-4 py-2 text-center bg-green-50 font-bold">{cls.Hadir}</td>
+                                    <td className="px-4 py-2 text-center">{cls.Izin}</td>
+                                    <td className="px-4 py-2 text-center">{cls.Sakit}</td>
+                                    <td className="px-4 py-2 text-center">{cls.Alpa}</td>
+                                    <td className="px-4 py-2 text-center">{cls.Terlambat}</td>
+                                    <td className="px-4 py-2 text-center font-bold bg-slate-50">{cls.Total}</td>
+                                </tr>
+                            ))}
+                            {sessionDetailData.length === 0 && (
+                                <tr><td colSpan={7} className="text-center py-6 text-slate-400">Tidak ada data untuk sesi ini.</td></tr>
+                            )}
+                        </tbody>
+                        <tfoot className="bg-slate-100 font-bold text-slate-800 text-xs uppercase">
+                            <tr>
+                                <td className="px-4 py-2">Total Global</td>
+                                <td className="px-4 py-2 text-center">{sessionDetailData.reduce((a:number, b:any) => a + b.Hadir, 0)}</td>
+                                <td className="px-4 py-2 text-center">{sessionDetailData.reduce((a:number, b:any) => a + b.Izin, 0)}</td>
+                                <td className="px-4 py-2 text-center">{sessionDetailData.reduce((a:number, b:any) => a + b.Sakit, 0)}</td>
+                                <td className="px-4 py-2 text-center">{sessionDetailData.reduce((a:number, b:any) => a + b.Alpa, 0)}</td>
+                                <td className="px-4 py-2 text-center">{sessionDetailData.reduce((a:number, b:any) => a + b.Terlambat, 0)}</td>
+                                <td className="px-4 py-2 text-center">{sessionDetailData.reduce((a:number, b:any) => a + b.Total, 0)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div className="mt-4 flex justify-end">
+                    <button onClick={() => setSelectedSession(null)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-semibold transition-colors">Tutup</button>
+                </div>
+            </Modal>
         </div>
     );
 };

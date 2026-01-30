@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import Card from '../../components/Card';
 import Modal from '../../components/Modal'; 
 import { useSupabaseData } from '../../hooks/useSupabaseData';
-import { SimplePieChart, MultiLineChart, StackedBarChart } from '../../components/Chart'; 
+import { SimplePieChart, MultiLineChart, StudentStackedBarChart } from '../../components/Chart'; 
 import { exportToExcel, exportToPDF } from '../../lib/utils';
 import { ALL_MARHALAH, KELAS_BY_MARHALAH, ALL_PERAN, ALL_ATTENDANCE_STATUS, ALL_WAKTU } from '../../constants';
 import { Marhalah, Peran, AttendanceStatus, Waktu, AttendanceRecord } from '../../types';
@@ -203,8 +203,8 @@ const LaporanRekapPage: React.FC = () => {
     };
 
     // Calculate dynamic width for chart
-    // Reduced multiplier to 40 to tighten the spacing between bars
-    const calculatedWidth = Math.max(1000, chartData.length * 40);
+    // Increased multiplier to 60px per bar (bar size 35px + gap) for cleaner look
+    const calculatedWidth = Math.max(1000, chartData.length * 60);
 
     if (loading) return <p>Loading...</p>;
     if (error) return <p className="text-error">{error}</p>;
@@ -360,19 +360,24 @@ const LaporanRekapPage: React.FC = () => {
                                 {menuOpen.bar && <div className="absolute right-0 w-32 bg-white shadow-lg border rounded p-1 z-20"><button onClick={() => handleDownloadChart(hiddenBarChartRef, 'Grafik_Batang_Siswa')} className="text-left w-full px-3 py-2 text-xs hover:bg-slate-50 flex items-center"><Download size={12} className="mr-2"/> Download PNG</button></div>}
                             </div>
                             
-                            {/* Visible Scrollable Chart */}
-                            {/* Key fix: overflow-x-auto on parent, fixed width on child based on calculation */}
+                            {/* Visible Scrollable Chart Container */}
                             <div className="overflow-x-auto pb-4 custom-scrollbar" ref={barChartRef}>
-                                <div style={{ width: Math.max(1000, calculatedWidth), height: '600px' }}>
-                                    <StackedBarChart data={chartData} />
+                                <div style={{ width: calculatedWidth, height: '500px' }}>
+                                    <StudentStackedBarChart 
+                                        data={chartData} 
+                                        height={500} 
+                                    />
                                 </div>
                             </div>
 
                             {/* Hidden Full-Width Chart for Download */}
                             <div style={{ position: 'fixed', left: 0, top: '-20000px', zIndex: -50 }}>
-                                <div ref={hiddenBarChartRef} style={{ width: Math.max(1000, calculatedWidth), height: 750, padding: 20, background: 'white' }}>
+                                <div ref={hiddenBarChartRef} style={{ width: calculatedWidth, height: 750, padding: 20, background: 'white' }}>
                                     <h3 className="text-xl font-bold text-center mb-6">Grafik Akumulasi Kehadiran Santri</h3>
-                                    <StackedBarChart data={chartData} />
+                                    <StudentStackedBarChart 
+                                        data={chartData} 
+                                        height={650} 
+                                    />
                                 </div>
                             </div>
                         </div>
