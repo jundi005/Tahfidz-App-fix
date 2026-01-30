@@ -194,7 +194,6 @@ export type Database = {
         }
         Relationships: []
       }
-      // ... (Existing tables omitted for brevity but remain unchanged) ...
       chat: {
         Row: {
           id: number
@@ -202,6 +201,8 @@ export type Database = {
           created_at: string
           content: string
           sender_email: string
+          sender_name: string | null
+          reply_to: Json | null
           is_deleted: boolean
         }
         Insert: {
@@ -210,6 +211,8 @@ export type Database = {
           created_at?: string
           content: string
           sender_email: string
+          sender_name?: string | null
+          reply_to?: Json | null
           is_deleted?: boolean
         }
         Update: {
@@ -218,6 +221,8 @@ export type Database = {
           created_at?: string
           content?: string
           sender_email?: string
+          sender_name?: string | null
+          reply_to?: Json | null
           is_deleted?: boolean
         }
         Relationships: []
