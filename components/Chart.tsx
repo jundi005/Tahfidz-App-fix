@@ -138,6 +138,7 @@ interface StackedBarChartProps {
   height?: number;
   bottomMargin?: number;
   rotateLabels?: boolean;
+  barSize?: number;
 }
 
 // KHUSUS UNTUK LAPORAN WAKTU / UMUM (Lebih Ramping)
@@ -145,7 +146,8 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
     data, 
     height = 350, 
     bottomMargin = 30, 
-    rotateLabels = false 
+    rotateLabels = false,
+    barSize = 40
 }) => (
   <ResponsiveContainer width="100%" height={height}>
     <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: bottomMargin }}>
@@ -153,13 +155,14 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
       <XAxis 
         dataKey="name" 
         interval={0} 
-        angle={-45} 
-        height={120} 
-        tick={{fontSize: 11, fill: '#475569', fontWeight: 600, textAnchor: "end"}}
+        angle={rotateLabels ? -45 : 0}  
+        textAnchor={rotateLabels ? "end" : "middle"}
+        height={bottomMargin}
+        tick={{fontSize: 12, fill: '#475569', fontWeight: 600, textAnchor: rotateLabels ? "end" : "middle"}}
         axisLine={false}
         tickLine={false}
-        //dx={-8} 
-        //dy={10}
+        dx={rotateLabels ? -5 : 0} 
+        dy={10}
       />
       <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
       <Tooltip 
@@ -167,11 +170,11 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
       />
       <Legend verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}} iconType="circle"/>
-      <Bar barSize={40} dataKey={AttendanceStatus.Hadir} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Hadir]} name="Hadir" radius={[0,0,4,4]} />
-      <Bar barSize={40} dataKey={AttendanceStatus.Sakit} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Sakit]} name="Sakit" />
-      <Bar barSize={40} dataKey={AttendanceStatus.Izin} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Izin]} name="Izin" />
-      <Bar barSize={40} dataKey={AttendanceStatus.Alpa} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Alpa]} name="Alpa" />
-      <Bar barSize={40} dataKey={AttendanceStatus.Terlambat} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Terlambat]} name="Terlambat" radius={[4,4,0,0]} />
+      <Bar barSize={barSize} dataKey={AttendanceStatus.Hadir} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Hadir]} name="Hadir" radius={[0,0,4,4]} />
+      <Bar barSize={barSize} dataKey={AttendanceStatus.Sakit} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Sakit]} name="Sakit" />
+      <Bar barSize={barSize} dataKey={AttendanceStatus.Izin} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Izin]} name="Izin" />
+      <Bar barSize={barSize} dataKey={AttendanceStatus.Alpa} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Alpa]} name="Alpa" />
+      <Bar barSize={barSize} dataKey={AttendanceStatus.Terlambat} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Terlambat]} name="Terlambat" radius={[4,4,0,0]} />
     </BarChart>
   </ResponsiveContainer>
 );
@@ -182,7 +185,7 @@ export const StudentStackedBarChart: React.FC<StackedBarChartProps> = ({
     height = 500 
 }) => (
   <ResponsiveContainer width="100%" height={height}>
-    <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 80 }}>
+    <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 120 }}>
       {/* Grid Horizontal Saja (Putus-putus) */}
       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#cbd5e1" />
       
@@ -190,13 +193,13 @@ export const StudentStackedBarChart: React.FC<StackedBarChartProps> = ({
       <XAxis 
         dataKey="name" 
         interval={0} 
-        angle={-45} 
+        angle={-45}  
+        textAnchor="end"
         height={120} 
         tick={{fontSize: 11, fill: '#475569', fontWeight: 600, textAnchor: "end"}}
         axisLine={false}
         tickLine={false}
-        //dx={-8} 
-        //dy={10}
+        // REMOVED manual dx/dy as requested, let textAnchor handle it
       />
       
       {/* Sumbu Y (Angka) */}
@@ -239,13 +242,20 @@ export const AttendanceColumnChart: React.FC<StackedBarChartProps> = ({ data }) 
   </ResponsiveContainer>
 );
 
-export const MultiLineChart: React.FC<{ data: any[] }> = ({ data }) => (
+export const MultiLineChart: React.FC<{ data: any[], isPercentage?: boolean }> = ({ data, isPercentage = false }) => (
     <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10}} minTickGap={30} />
-            <YAxis axisLine={false} tickLine={false} />
-            <Tooltip />
+            <YAxis 
+                axisLine={false} 
+                tickLine={false} 
+                tickFormatter={(val) => isPercentage ? `${val}%` : val}
+                domain={isPercentage ? [0, 100] : ['auto', 'auto']}
+            />
+            <Tooltip 
+                formatter={(value: number) => [isPercentage ? `${value}%` : value]}
+            />
             <Legend />
             <Line type="monotone" dataKey={AttendanceStatus.Hadir} stroke={STATUS_COLORS[AttendanceStatus.Hadir]} strokeWidth={2} dot={false} name="Hadir" />
             <Line type="monotone" dataKey={AttendanceStatus.Izin} stroke={STATUS_COLORS[AttendanceStatus.Izin]} strokeWidth={2} dot={false} name="Izin" />

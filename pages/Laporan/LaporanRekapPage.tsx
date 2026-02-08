@@ -120,7 +120,7 @@ const LaporanRekapPage: React.FC = () => {
         return Object.entries(stats).map(([name, value]) => ({ name, value }));
     }, [filteredData]);
 
-    // Trend Data (Last 30 Days based on current filter or today)
+    // Trend Data (Last 30 Days based on current filter or today) - PERCENTAGE CALCULATION
     const trendData = useMemo(() => {
         const parseDate = (dateStr: string) => {
             const parts = dateStr.split('-');
@@ -145,6 +145,9 @@ const LaporanRekapPage: React.FC = () => {
         
         // Generate blank days
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            // SKIP FRIDAY (Day 5) to match Dashboard logic
+            if (d.getDay() === 5) continue;
+
             const strDate = format(d, 'yyyy-MM-dd');
             days[strDate] = { 
                 date: format(d, 'dd MMM'), 
@@ -157,14 +160,35 @@ const LaporanRekapPage: React.FC = () => {
             };
         }
 
-        // Fill with data
+        // Fill with data count first
         filteredData.forEach(r => {
             if (days[r.date]) {
                 days[r.date][r.status]++;
             }
         });
 
-        return Object.values(days).sort((a: any, b: any) => a.fullDate.localeCompare(b.fullDate));
+        // Convert counts to percentages
+        const sortedDays = Object.values(days).sort((a: any, b: any) => a.fullDate.localeCompare(b.fullDate));
+        
+        return sortedDays.map((day: any) => {
+            const total = day[AttendanceStatus.Hadir] + 
+                          day[AttendanceStatus.Izin] + 
+                          day[AttendanceStatus.Sakit] + 
+                          day[AttendanceStatus.Alpa] + 
+                          day[AttendanceStatus.Terlambat];
+            
+            const result = { ...day };
+            
+            if (total > 0) {
+                result[AttendanceStatus.Hadir] = parseFloat(((day[AttendanceStatus.Hadir] / total) * 100).toFixed(1));
+                result[AttendanceStatus.Izin] = parseFloat(((day[AttendanceStatus.Izin] / total) * 100).toFixed(1));
+                result[AttendanceStatus.Sakit] = parseFloat(((day[AttendanceStatus.Sakit] / total) * 100).toFixed(1));
+                result[AttendanceStatus.Alpa] = parseFloat(((day[AttendanceStatus.Alpa] / total) * 100).toFixed(1));
+                result[AttendanceStatus.Terlambat] = parseFloat(((day[AttendanceStatus.Terlambat] / total) * 100).toFixed(1));
+            }
+            
+            return result;
+        });
     }, [filteredData, dateRange]);
 
     const studentDetailData = useMemo(() => {
@@ -203,7 +227,6 @@ const LaporanRekapPage: React.FC = () => {
     };
 
     // Calculate dynamic width for chart
-    // Increased multiplier to 60px per bar (bar size 35px + gap) for cleaner look
     const calculatedWidth = Math.max(1000, chartData.length * 60);
 
     if (loading) return <p>Loading...</p>;
@@ -327,14 +350,14 @@ const LaporanRekapPage: React.FC = () => {
 
             {/* CHARTS SECTION */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card title="Tren Kehadiran (30 Hari Terakhir)">
+                <Card title="Tren Kehadiran (30 Hari Terakhir) - Persentase (%)">
                     <div className="relative" ref={lineMenuRef}>
                         <div className="absolute right-0 top-0 z-10">
                             <button onClick={() => setMenuOpen(p => ({...p, line: !p.line}))} className="p-1 hover:bg-slate-100 rounded"><MoreVertical size={16}/></button>
                             {menuOpen.line && <div className="absolute right-0 w-32 bg-white shadow-lg border rounded p-1 z-20"><button onClick={() => handleDownloadChart(lineChartRef, 'Tren_Kehadiran')} className="text-left w-full px-3 py-2 text-xs hover:bg-slate-50 flex items-center"><Download size={12} className="mr-2"/> Download PNG</button></div>}
                         </div>
                         <div ref={lineChartRef} className="pt-2">
-                            <MultiLineChart data={trendData} />
+                            <MultiLineChart data={trendData} isPercentage={true} />
                         </div>
                     </div>
                 </Card>

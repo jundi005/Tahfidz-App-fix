@@ -201,6 +201,7 @@ const LaporanWaktuPage: React.FC = () => {
                             height={350} 
                             bottomMargin={30} 
                             rotateLabels={false} 
+                            barSize={100}
                         />
                     </div>
                 </div>

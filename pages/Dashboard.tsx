@@ -139,7 +139,7 @@ const Dashboard: React.FC = () => {
         }).reverse();
     }, [attendance]);
 
-    // 4. Trend Data (30 Days) - Filtered to exclude Friday (Jumat)
+    // 4. Trend Data (30 Days) - Percentage Calculation
     const trendData = useMemo(() => {
         const endDate = new Date();
         const startDate = new Date(endDate);
@@ -163,7 +163,7 @@ const Dashboard: React.FC = () => {
             };
         }
 
-        // Fill with actual data
+        // Fill with actual counts first
         attendance.forEach(r => {
             // Only add data if the date exists in our map (which excludes Fridays)
             if (days[r.date]) {
@@ -171,7 +171,29 @@ const Dashboard: React.FC = () => {
             }
         });
 
-        return Object.values(days).sort((a: any, b: any) => a.fullDate.localeCompare(b.fullDate));
+        // Convert counts to percentages
+        const sortedDays = Object.values(days).sort((a: any, b: any) => a.fullDate.localeCompare(b.fullDate));
+        
+        return sortedDays.map((day: any) => {
+            const total = day[AttendanceStatus.Hadir] + 
+                          day[AttendanceStatus.Izin] + 
+                          day[AttendanceStatus.Sakit] + 
+                          day[AttendanceStatus.Alpa] + 
+                          day[AttendanceStatus.Terlambat];
+            
+            const result = { ...day };
+            
+            if (total > 0) {
+                // Calculate percentage for each status
+                result[AttendanceStatus.Hadir] = parseFloat(((day[AttendanceStatus.Hadir] / total) * 100).toFixed(1));
+                result[AttendanceStatus.Izin] = parseFloat(((day[AttendanceStatus.Izin] / total) * 100).toFixed(1));
+                result[AttendanceStatus.Sakit] = parseFloat(((day[AttendanceStatus.Sakit] / total) * 100).toFixed(1));
+                result[AttendanceStatus.Alpa] = parseFloat(((day[AttendanceStatus.Alpa] / total) * 100).toFixed(1));
+                result[AttendanceStatus.Terlambat] = parseFloat(((day[AttendanceStatus.Terlambat] / total) * 100).toFixed(1));
+            }
+            
+            return result;
+        });
     }, [attendance]);
 
     // Helper for status colors
@@ -376,10 +398,10 @@ const Dashboard: React.FC = () => {
             </div>
           </Card>
 
-          {/* New 30 Days Trend Chart */}
-          <Card title="Tren Kehadiran (30 Hari Terakhir)">
+          {/* New 30 Days Trend Chart (Percentage) */}
+          <Card title="Tren Kehadiran (30 Hari Terakhir) - Persentase (%)">
              <div className="pt-2">
-                <MultiLineChart data={trendData} />
+                <MultiLineChart data={trendData} isPercentage={true} />
              </div>
           </Card>
       </div>

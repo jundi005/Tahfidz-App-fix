@@ -144,7 +144,14 @@ const HalaqahPage: React.FC = () => {
                 no_urut: noUrut
             });
             setModalType(null);
-        } catch (e: any) { alert(e.message); }
+        } catch (e: any) { 
+            console.error(e);
+            if (e.message?.includes('duplicate key value') && e.message?.includes('halaqah_pkey')) {
+                alert("TERJADI ERROR SEQUENCE DATABASE (ID Konflik).\n\nSolusi: Silakan jalankan script 'fix_id_sequences.sql' di SQL Editor Supabase untuk mereset penomoran ID otomatis.");
+            } else {
+                alert(e.message); 
+            }
+        }
         finally { setIsSubmitting(false); }
     };
 
