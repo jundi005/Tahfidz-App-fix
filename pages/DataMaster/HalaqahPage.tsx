@@ -6,8 +6,8 @@ import ActionDropdown from '../../components/ActionDropdown';
 import SantriMultiSelect from '../../components/SantriMultiSelect';
 import { useSupabaseData } from '../../hooks/useSupabaseData';
 import { HalaqahType, Marhalah, Waktu, Halaqah } from '../../types';
-import { ALL_HALAQAH_TYPE, ALL_MARHALAH } from '../../constants';
-import { Plus, Trash, Users, Edit, ArrowLeft, X, Search, Upload, Download, FileSpreadsheet, FileText, Save, CheckSquare, Square } from 'lucide-react';
+import { ALL_HALAQAH_TYPE, ALL_MARHALAH, ALL_WAKTU } from '../../constants';
+import { Plus, Trash, Users, Edit, ArrowLeft, X, Search, Upload, Download, FileSpreadsheet, FileText, Save, CheckSquare, Square, Clock } from 'lucide-react';
 import { parseCSV, exportToExcel, exportToPDF } from '../../lib/utils';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -29,6 +29,7 @@ const HalaqahPage: React.FC = () => {
     const [selectedMusammiId, setSelectedMusammiId] = useState('');
     const [selectedJenis, setSelectedJenis] = useState<HalaqahType>(HalaqahType.Utama);
     const [selectedMarhalah, setSelectedMarhalah] = useState<Marhalah>(Marhalah.Mutawassithah);
+    const [selectedWaktu, setSelectedWaktu] = useState<Waktu[]>([]); // New State for Waktu
     const [selectedSantriIds, setSelectedSantriIds] = useState<number[]>([]);
     
     // Custom Type
@@ -96,8 +97,6 @@ const HalaqahPage: React.FC = () => {
         if (confirm(`Apakah Anda yakin ingin menghapus ${selectedHalaqahIds.length} halaqah yang dipilih? Data absensi terkait akan hilang.`)) {
             setIsSubmitting(true);
             try {
-                // Delete one by one to use the hook logic (or create a bulk delete hook)
-                // Using loop for simplicity with current hooks
                 for (const id of selectedHalaqahIds) {
                     await deleteHalaqah(id);
                 }
@@ -120,8 +119,15 @@ const HalaqahPage: React.FC = () => {
         setSelectedMusammiId(String(selectedHalaqah.musammi.id));
         setSelectedJenis(selectedHalaqah.jenis);
         setSelectedMarhalah(selectedHalaqah.marhalah);
+        setSelectedWaktu(selectedHalaqah.waktu || []); // Load existing times
         setSelectedSantriIds(selectedHalaqah.santri.map(s => s.id));
         setModalType('edit');
+    };
+
+    const toggleWaktuSelection = (w: Waktu) => {
+        setSelectedWaktu(prev => 
+            prev.includes(w) ? prev.filter(item => item !== w) : [...prev, w]
+        );
     };
 
     const handleCreate = async () => {
@@ -129,9 +135,9 @@ const HalaqahPage: React.FC = () => {
         try {
             if (!newHalaqahName) throw new Error("Nama wajib diisi");
             if (!selectedMusammiId) throw new Error("Pilih Musammi");
+            if (selectedWaktu.length === 0) throw new Error("Pilih setidaknya satu waktu halaqah.");
             
             const finalJenis = isCustomJenis ? customJenisName : selectedJenis;
-            const waktu = finalJenis.toLowerCase().includes('pagi') ? [Waktu.Dhuha] : [Waktu.Shubuh, Waktu.Ashar, Waktu.Isya];
             const santriObj = santri.filter(s => selectedSantriIds.includes(s.id));
 
             await addHalaqah({
@@ -140,7 +146,7 @@ const HalaqahPage: React.FC = () => {
                 santri: santriObj,
                 marhalah: selectedMarhalah,
                 jenis: finalJenis,
-                waktu,
+                waktu: selectedWaktu, // Use selected times
                 no_urut: noUrut
             });
             setModalType(null);
@@ -161,12 +167,14 @@ const HalaqahPage: React.FC = () => {
         try {
             const orgId = await getOrgId();
             const finalJenis = isCustomJenis ? customJenisName : selectedJenis;
+            if (selectedWaktu.length === 0) throw new Error("Pilih setidaknya satu waktu halaqah.");
 
             await updateHalaqah(selectedHalaqah.id, {
                 nama: newHalaqahName,
                 musammi_id: parseInt(selectedMusammiId),
                 marhalah: selectedMarhalah,
                 jenis: finalJenis,
+                waktu: selectedWaktu, // Use selected times
                 no_urut: noUrut
             });
 
@@ -215,9 +223,9 @@ const HalaqahPage: React.FC = () => {
 
     // Import/Export Logic
     const handleDownloadTemplate = () => {
-        // Added 'musammi_id' and 'santri_id' to headers
-        const headers = ['id_halaqah', 'no_urut', 'nama_halaqah', 'jenis_halaqah', 'marhalah_halaqah', 'musammi_id', 'nama_musammi', 'santri_id', 'nama_santri', 'marhalah_santri', 'kelas_santri'];
-        const dummy = ['', '1', 'Halaqah 1', 'Halaqah Utama', 'Mutawassithah', '101', 'Ustadz Fulan', '205', 'Santri A', 'Mutawassithah', '1A'];
+        // Added 'waktu_halaqah' to headers
+        const headers = ['id_halaqah', 'no_urut', 'nama_halaqah', 'jenis_halaqah', 'marhalah_halaqah', 'waktu_halaqah', 'musammi_id', 'nama_musammi', 'santri_id', 'nama_santri', 'marhalah_santri', 'kelas_santri'];
+        const dummy = ['', '1', 'Halaqah 1', 'Halaqah Utama', 'Mutawassithah', 'Shubuh,Ashar,Isya', '101', 'Ustadz Fulan', '205', 'Santri A', 'Mutawassithah', '1A'];
         const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), dummy.join(',')].join('\n');
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -237,12 +245,12 @@ const HalaqahPage: React.FC = () => {
             let errors: string[] = [];
 
             // 1. Group Data
-            // Key determination: Use ID if provided, otherwise Name
             const groupedData: Record<string, {
-                id?: number, // Store Halaqah ID if present
+                id?: number,
                 no_urut: number,
                 jenis: string,
                 marhalah: string,
+                waktuRaw?: string,
                 musammi_id?: number,
                 nama_musammi: string,
                 nama_halaqah: string,
@@ -253,11 +261,10 @@ const HalaqahPage: React.FC = () => {
                 const namaHalaqah = row.nama_halaqah;
                 const importId = row.id_halaqah || row.id ? parseInt(row.id_halaqah || row.id) : undefined;
                 
-                // Allow fallback keys if user uses old template or variations
                 const jenis = row.jenis_halaqah || row.jenis || 'Halaqah Utama';
                 const marhalah = row.marhalah_halaqah || row.marhalah || 'Mutawassithah';
+                const waktuRaw = row.waktu_halaqah || row.waktu; // New column from CSV
                 
-                // Person IDs
                 const musammiId = row.musammi_id ? parseInt(row.musammi_id) : undefined;
                 const santriId = row.santri_id ? parseInt(row.santri_id) : undefined;
 
@@ -265,13 +272,11 @@ const HalaqahPage: React.FC = () => {
                 const santriName = row.nama_santri;
                 const noUrut = row.no_urut ? parseInt(row.no_urut) : 999;
                 
-                // Santri details (Optional but useful for matching)
                 const santriMarhalah = row.marhalah_santri;
                 const santriKelas = row.kelas_santri;
 
                 if (!namaHalaqah) continue;
 
-                // Create a unique key for grouping. Use ID prefix if ID exists to avoid name collisions.
                 const groupKey = importId ? `ID:${importId}` : `NAME:${namaHalaqah}`;
 
                 if (!groupedData[groupKey]) {
@@ -281,6 +286,7 @@ const HalaqahPage: React.FC = () => {
                         no_urut: noUrut,
                         jenis: jenis,
                         marhalah: marhalah,
+                        waktuRaw: waktuRaw,
                         musammi_id: musammiId,
                         nama_musammi: musammiName || 'Unknown',
                         santriList: []
@@ -299,43 +305,46 @@ const HalaqahPage: React.FC = () => {
 
             // 2. Process Groups
             for (const group of Object.values(groupedData)) {
-                // A. Find Musammi (Priority: ID -> Name)
                 let targetMusammi;
-                if (group.musammi_id) {
-                    targetMusammi = musammi.find(m => m.id === group.musammi_id);
-                }
-                
-                if (!targetMusammi && group.nama_musammi) {
-                    targetMusammi = musammi.find(m => m.nama.toLowerCase() === group.nama_musammi.toLowerCase());
-                }
+                if (group.musammi_id) targetMusammi = musammi.find(m => m.id === group.musammi_id);
+                if (!targetMusammi && group.nama_musammi) targetMusammi = musammi.find(m => m.nama.toLowerCase() === group.nama_musammi.toLowerCase());
 
                 if (!targetMusammi) {
                     errors.push(`Musammi tidak ditemukan (ID: ${group.musammi_id || '-'}, Nama: ${group.nama_musammi}) di Halaqah: ${group.nama_halaqah}`);
                     continue;
                 }
 
-                const waktu = group.jenis.toLowerCase().includes('pagi') ? [Waktu.Dhuha] : [Waktu.Shubuh, Waktu.Ashar, Waktu.Isya];
+                // Determine Waktu from CSV or Fallback
+                let waktu: Waktu[] = [];
+                if (group.waktuRaw) {
+                    const raw = group.waktuRaw.toLowerCase();
+                    if (raw.includes('shubuh')) waktu.push(Waktu.Shubuh);
+                    if (raw.includes('dhuha')) waktu.push(Waktu.Dhuha);
+                    if (raw.includes('ashar')) waktu.push(Waktu.Ashar);
+                    if (raw.includes('isya')) waktu.push(Waktu.Isya);
+                } else {
+                    // Fallback logic
+                    waktu = group.jenis.toLowerCase().includes('pagi') ? [Waktu.Dhuha] : [Waktu.Shubuh, Waktu.Ashar, Waktu.Isya];
+                }
+                
+                if (waktu.length === 0) waktu = [Waktu.Shubuh, Waktu.Ashar, Waktu.Isya]; // Default safe fallback
+
                 let targetHalaqahId: number | null = null;
 
-                // B. Find or Create Halaqah based on ID first, then Name
                 if (group.id) {
-                    // Try to find by ID
                     const existingById = halaqah.find(h => h.id === group.id);
                     if (existingById) {
                         targetHalaqahId = existingById.id;
-                        // Update
                         const { error: upError } = await supabase.from('halaqah').update({
-                            nama: group.nama_halaqah, // Update name if changed
+                            nama: group.nama_halaqah,
                             musammi_id: targetMusammi.id,
                             marhalah: group.marhalah as Marhalah,
                             jenis: group.jenis,
                             waktu: waktu,
                             no_urut: group.no_urut
                         }).eq('id', targetHalaqahId);
-                        
                         if (!upError) updatedHalaqahCount++;
                     } else {
-                        // Fallback: If ID not found, try Name or Create New
                         const existingByName = halaqah.find(h => h.nama.toLowerCase() === group.nama_halaqah.toLowerCase());
                         if (existingByName) {
                              targetHalaqahId = existingByName.id;
@@ -348,7 +357,6 @@ const HalaqahPage: React.FC = () => {
                             }).eq('id', targetHalaqahId);
                             updatedHalaqahCount++;
                         } else {
-                            // Create New
                             const { data: newHalaqah, error: createError } = await supabase.from('halaqah').insert({
                                 organization_id: orgId,
                                 nama: group.nama_halaqah,
@@ -368,7 +376,6 @@ const HalaqahPage: React.FC = () => {
                         }
                     }
                 } else {
-                    // No ID provided, legacy match by Name
                     const existingHalaqah = halaqah.find(h => h.nama.toLowerCase() === group.nama_halaqah.toLowerCase());
                     
                     if (existingHalaqah) {
@@ -380,7 +387,6 @@ const HalaqahPage: React.FC = () => {
                             waktu: waktu,
                             no_urut: group.no_urut
                         }).eq('id', targetHalaqahId);
-                        
                         if (!upError) updatedHalaqahCount++;
                     } else {
                         const { data: newHalaqah, error: createError } = await supabase.from('halaqah').insert({
@@ -402,31 +408,19 @@ const HalaqahPage: React.FC = () => {
                     }
                 }
 
-                // C. Add Santri to Halaqah
                 if (targetHalaqahId && group.santriList.length > 0) {
                     const santriToInsert = [];
                     for (const sData of group.santriList) {
                         let targetSantri;
-
-                        // 1. Try Find by ID
-                        if (sData.id) {
-                            targetSantri = santri.find(s => s.id === sData.id);
-                        }
-
-                        // 2. Fallback: Find by Name (+ Class/Marhalah if available)
+                        if (sData.id) targetSantri = santri.find(s => s.id === sData.id);
                         if (!targetSantri) {
                             targetSantri = santri.find(s => {
                                 const nameMatch = s.nama.toLowerCase() === sData.nama.toLowerCase();
                                 const classMatch = sData.kelas ? s.kelas.toLowerCase() === sData.kelas.toLowerCase() : true;
-                                const marhalahMatch = sData.marhalah ? s.marhalah.toLowerCase() === sData.marhalah.toLowerCase() : true;
-                                return nameMatch && classMatch && marhalahMatch;
+                                return nameMatch && classMatch;
                             });
                         }
-
-                        // 3. Fallback: Name only
-                        if (!targetSantri) {
-                            targetSantri = santri.find(s => s.nama.toLowerCase() === sData.nama.toLowerCase());
-                        }
+                        if (!targetSantri) targetSantri = santri.find(s => s.nama.toLowerCase() === sData.nama.toLowerCase());
 
                         if (targetSantri) {
                             santriToInsert.push({
@@ -458,15 +452,15 @@ const HalaqahPage: React.FC = () => {
         const data: any[] = [];
         filteredHalaqah.forEach((h, index) => {
             const noHalaqah = h.no_urut || (index + 1);
-            // Include ID for re-import capability
             data.push({
                 'ID': h.id,
                 'No Urut': noHalaqah,
                 'Nama Halaqah': h.nama,
                 'Jenis': h.jenis,
                 'Marhalah': h.marhalah,
+                'Waktu': h.waktu.join(','),
                 'Peran': 'Musammi',
-                'Person ID': h.musammi.id, // Explicit ID for re-import
+                'Person ID': h.musammi.id,
                 'Nama Anggota': h.musammi.nama,
                 'Kelas': '-',
                 'Kode': h.musammi.kode || '-'
@@ -478,8 +472,9 @@ const HalaqahPage: React.FC = () => {
                     'Nama Halaqah': h.nama,
                     'Jenis': h.jenis,
                     'Marhalah': h.marhalah,
+                    'Waktu': h.waktu.join(','),
                     'Peran': 'Santri',
-                    'Person ID': s.id, // Explicit ID for re-import
+                    'Person ID': s.id,
                     'Nama Anggota': s.nama,
                     'Kelas': s.kelas,
                     'Kode': s.kode || '-'
@@ -493,8 +488,8 @@ const HalaqahPage: React.FC = () => {
     
     const handleExportPDF = () => {
         const data = getDetailedExportData();
-        const columns = ['ID', 'Nama Halaqah', 'Peran', 'Person ID', 'Nama Anggota', 'Kelas'];
-        const rows = data.map(d => [d['ID'], d['Nama Halaqah'], d['Peran'], d['Person ID'], d['Nama Anggota'], d['Kelas']]);
+        const columns = ['ID', 'Nama Halaqah', 'Waktu', 'Peran', 'Nama Anggota', 'Kelas'];
+        const rows = data.map(d => [d['ID'], d['Nama Halaqah'], d['Waktu'], d['Peran'], d['Nama Anggota'], d['Kelas']]);
         exportToPDF("Data Halaqah Lengkap", columns, rows, "Data_Halaqah_Lengkap");
     };
 
@@ -512,12 +507,13 @@ const HalaqahPage: React.FC = () => {
                     <div className="flex flex-col md:flex-row justify-between items-start -mt-6 -mx-6 px-6 py-4 border-b border-slate-200 mb-6 bg-slate-50 rounded-t-xl">
                         <div>
                             <h2 className="text-xl font-bold text-slate-800">{selectedHalaqah.nama}</h2>
-                            <div className="flex items-center text-sm text-slate-500 mt-1 space-x-3">
+                            <div className="flex items-center text-sm text-slate-500 mt-1 space-x-3 flex-wrap gap-y-1">
                                 <span className="flex items-center font-mono text-xs bg-slate-200 px-1.5 rounded">#{selectedHalaqah.id}</span>
                                 <span className="flex items-center"><Users size={14} className="mr-1"/> {selectedHalaqah.musammi.nama}</span>
                                 <span>•</span><span>{selectedHalaqah.marhalah}</span>
                                 <span>•</span><span>{selectedHalaqah.jenis}</span>
                                 <span>•</span><span>No. {selectedHalaqah.no_urut || '-'}</span>
+                                <span>•</span><span className="flex items-center text-slate-600 font-medium"><Clock size={12} className="mr-1"/> {selectedHalaqah.waktu.join(', ')}</span>
                             </div>
                         </div>
                         <div className="flex gap-2 mt-4 md:mt-0">
@@ -588,6 +584,24 @@ const HalaqahPage: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Waktu Checkboxes */}
+                        <div className="bg-slate-50 p-3 rounded-md border border-slate-200">
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Waktu Halaqah</label>
+                            <div className="flex flex-wrap gap-3">
+                                {ALL_WAKTU.map(w => (
+                                    <label key={w} className="flex items-center space-x-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedWaktu.includes(w)} 
+                                            onChange={() => toggleWaktuSelection(w)}
+                                            className="rounded text-secondary focus:ring-secondary border-gray-300"
+                                        />
+                                        <span className="text-sm text-slate-700">{w}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Musammi (Pengajar)</label>
                             <select className="w-full border-slate-300 rounded-md text-sm" value={selectedMusammiId} onChange={e => setSelectedMusammiId(e.target.value)}>
@@ -640,7 +654,7 @@ const HalaqahPage: React.FC = () => {
 
                         <input type="file" ref={fileInputRef} onChange={handleImportCSV} accept=".csv" className="hidden" />
                         
-                        <button onClick={() => { setModalType('create'); setNewHalaqahName(''); setNoUrut(999); setSelectedSantriIds([]); }} className="bg-secondary text-white py-2 px-4 rounded-lg flex items-center text-sm font-semibold hover:bg-accent shadow-sm">
+                        <button onClick={() => { setModalType('create'); setNewHalaqahName(''); setNoUrut(999); setSelectedSantriIds([]); setSelectedWaktu([Waktu.Shubuh, Waktu.Ashar, Waktu.Isya]); }} className="bg-secondary text-white py-2 px-4 rounded-lg flex items-center text-sm font-semibold hover:bg-accent shadow-sm">
                             <Plus size={18} className="mr-2"/> Buat Baru
                         </button>
 
@@ -697,6 +711,7 @@ const HalaqahPage: React.FC = () => {
                                 <th className="px-6 py-3 font-bold tracking-wider">Musammi'</th>
                                 <th className="px-6 py-3 font-bold tracking-wider">Marhalah</th>
                                 <th className="px-6 py-3 font-bold tracking-wider">Jenis</th>
+                                <th className="px-6 py-3 font-bold tracking-wider">Waktu</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 bg-white">
@@ -712,10 +727,11 @@ const HalaqahPage: React.FC = () => {
                                         <td className="px-6 py-4">{h.musammi.nama}</td>
                                         <td className="px-6 py-4">{h.marhalah}</td>
                                         <td className="px-6 py-4"><span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">{h.jenis}</span></td>
+                                        <td className="px-6 py-4 text-xs text-slate-500 max-w-[150px] truncate" title={h.waktu.join(', ')}>{h.waktu.join(', ')}</td>
                                     </tr>
                                 );
                             })}
-                            {filteredHalaqah.length === 0 && <tr><td colSpan={6} className="text-center py-8 text-slate-400">Tidak ada data ditemukan.</td></tr>}
+                            {filteredHalaqah.length === 0 && <tr><td colSpan={7} className="text-center py-8 text-slate-400">Tidak ada data ditemukan.</td></tr>}
                         </tbody>
                     </table>
                 </div>
@@ -746,6 +762,26 @@ const HalaqahPage: React.FC = () => {
                         )}
                         <select className="w-full border-slate-300 rounded-md text-sm" value={selectedMarhalah} onChange={e => setSelectedMarhalah(e.target.value as any)}>{ALL_MARHALAH.map(m => <option key={m} value={m}>{m}</option>)}</select>
                     </div>
+
+                    {/* Waktu Checkboxes Create Mode */}
+                    <div className="bg-slate-50 p-3 rounded-md border border-slate-200">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Waktu Halaqah</label>
+                        <div className="flex flex-wrap gap-3">
+                            {ALL_WAKTU.map(w => (
+                                <label key={w} className="flex items-center space-x-2 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selectedWaktu.includes(w)} 
+                                        onChange={() => toggleWaktuSelection(w)}
+                                        className="rounded text-secondary focus:ring-secondary border-gray-300"
+                                    />
+                                    <span className="text-sm text-slate-700">{w}</span>
+                                </label>
+                            ))}
+                        </div>
+                        {selectedWaktu.length === 0 && <p className="text-xs text-red-500 mt-1">Pilih minimal 1 waktu.</p>}
+                    </div>
+
                     <select className="w-full border-slate-300 rounded-md text-sm" value={selectedMusammiId} onChange={e => setSelectedMusammiId(e.target.value)}><option value="">-- Pilih Musammi --</option>{musammi.map(m => <option key={m.id} value={m.id}>{m.nama} ({m.marhalah})</option>)}</select>
                     <div className="pt-2 border-t"><SantriMultiSelect santriList={availableSantri} selectedIds={selectedSantriIds} onToggle={id => setSelectedSantriIds(p => p.includes(id) ? p.filter(x => x!==id) : [...p, id])} label="Anggota Awal (Opsional)"/></div>
                     <div className="flex justify-end pt-4 gap-2"><button onClick={() => setModalType(null)} className="px-4 py-2 border rounded-md">Batal</button><button onClick={handleCreate} disabled={isSubmitting} className="px-4 py-2 bg-secondary text-white rounded-md">{isSubmitting ? '...' : 'Buat'}</button></div>

@@ -103,6 +103,14 @@ const LaporanKelasPage: React.FC = () => {
         setGeneratedReports({});
         await new Promise(r => setTimeout(r, 800)); // Wait for DOM
 
+        const formatDateIndo = (dateStr: string) => {
+            if (!dateStr) return '...';
+            const parts = dateStr.split('-');
+            const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+            return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+        };
+
         const reports: Record<string, any> = {};
         for (const classKey of selectedClassKeys) {
             const classItem = classRecapData.find((c: any) => c.key === classKey);
@@ -119,9 +127,23 @@ const LaporanKelasPage: React.FC = () => {
 
             const wali = waliKelas.find(w => w.marhalah === classItem.Marhalah && w.kelas === classItem.Kelas);
             
-            let caption = `*LAPORAN ABSENSI KELAS*\nKelas: ${classItem.Kelas} (${classItem.Marhalah})\nPeriode: ${dateRange.start || '...'} s.d ${dateRange.end || '...'}\n\n`;
-            caption += `Hadir: ${classItem.Hadir} | Izin: ${classItem.Izin} | Sakit: ${classItem.Sakit} | Alpa: ${classItem.Alpa} | Telat: ${classItem.Terlambat}\n\n`;
-            caption += `*DAFTAR SANTRI BERMASALAH*\n`;
+            let periodStr = formatDateIndo(dateRange.start);
+            if (dateRange.start !== dateRange.end && dateRange.end) {
+                periodStr += ` s.d ${formatDateIndo(dateRange.end)}`;
+            }
+
+            let caption = `*LAPORAN ABSENSI KELAS*\n`;
+            caption += `Kelas: ${classItem.Kelas} (${classItem.Marhalah})\n`;
+            caption += `Periode: ${periodStr}\n\n`;
+            
+            caption += `*Rekap Kehadiran*\n`;
+            caption += `Hadir: ${classItem.Hadir}\n`;
+            caption += `Izin: ${classItem.Izin}\n`;
+            caption += `Sakit: ${classItem.Sakit}\n`;
+            caption += `Alpa: ${classItem.Alpa}\n`;
+            caption += `Terlambat: ${classItem.Terlambat}\n\n`;
+            
+            caption += `*Santri Bermasalah*\n\n`;
 
             // AGGREGATE ABSENCE COUNTS PER STUDENT
             const problematicStudents = filteredData.filter(r => 
@@ -136,14 +158,17 @@ const LaporanKelasPage: React.FC = () => {
 
             if (Object.keys(problematicStudents).length === 0) caption += `(Nihil - Semua Hadir)\n`;
             else {
-                Object.entries(problematicStudents).forEach(([name, counts]: [string, any], idx) => {
-                    // Format count: "Alpa: 2, Izin: 1"
+                Object.entries(problematicStudents).sort((a,b) => a[0].localeCompare(b[0])).forEach(([name, counts]: [string, any], idx) => {
+                    // Format count: "Alpa (2), Izin (1)"
                     const details = Object.entries(counts)
-                        .map(([status, count]) => `${status}: ${count}`)
+                        .map(([status, count]) => `${status} (${count})`)
                         .join(', ');
-                    caption += `${idx + 1}. ${name} (${details})\n`;
+                    caption += `${idx + 1}. ${name} — ${details}\n`;
                 });
             }
+            
+            caption += `\n—\n`;
+            caption += `Laporan ini digenerate otomatis oleh Tahfidz App – Sistem Informasi Tahfidz`;
             
             reports[classKey] = { image: imageUrl, caption, phone: wali?.no_hp };
         }

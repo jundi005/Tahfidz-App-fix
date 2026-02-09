@@ -40,8 +40,20 @@ const AttendanceBook: React.FC = () => {
     
     // Duration is now a number (number of weeks)
     const [durationWeeks, setDurationWeeks] = useState<number>(1);
-    const [selectedType, setSelectedType] = useState<HalaqahType>(HalaqahType.Utama);
+    const [selectedType, setSelectedType] = useState<string>(HalaqahType.Utama); // Changed type to string to allow custom types
     const [selectedMarhalah, setSelectedMarhalah] = useState<Marhalah | 'all'>('all');
+
+    // --- NEW: Calculate Dynamic Available Types ---
+    const availableTypes = useMemo(() => {
+        const types = new Set<string>(ALL_HALAQAH_TYPE);
+        // Add custom types found in the database
+        if (halaqah && halaqah.length > 0) {
+            halaqah.forEach(h => {
+                if (h.jenis) types.add(h.jenis);
+            });
+        }
+        return Array.from(types).sort();
+    }, [halaqah]);
 
     // Filter Halaqah List
     const filteredHalaqah = useMemo(() => {
@@ -355,7 +367,8 @@ const AttendanceBook: React.FC = () => {
                             onChange={e => setSelectedType(e.target.value as HalaqahType)} 
                             className="block w-full border-slate-300 rounded-md shadow-sm focus:ring-secondary focus:border-secondary sm:text-sm"
                         >
-                            {ALL_HALAQAH_TYPE.map(t => <option key={t} value={t}>{t}</option>)}
+                            {/* Uses Dynamic availableTypes */}
+                            {availableTypes.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
 

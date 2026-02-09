@@ -223,7 +223,8 @@ export const useSupabaseData = () => {
         jenis?: HalaqahType, 
         nama?: string,
         marhalah?: Marhalah,
-        no_urut?: number
+        no_urut?: number,
+        waktu?: Waktu[]
     }) => {
          const { error } = await supabase.from('halaqah').update(updatedData).eq('id', id);
         if (error) throw error;
