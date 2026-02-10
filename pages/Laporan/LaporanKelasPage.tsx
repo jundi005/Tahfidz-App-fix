@@ -143,7 +143,7 @@ const LaporanKelasPage: React.FC = () => {
             caption += `Alpa: ${classItem.Alpa}\n`;
             caption += `Terlambat: ${classItem.Terlambat}\n\n`;
             
-            caption += `*Santri Bermasalah*\n\n`;
+            caption += `*Catatan*\n\n`;
 
             // AGGREGATE ABSENCE COUNTS PER STUDENT
             const problematicStudents = filteredData.filter(r => 
@@ -156,7 +156,7 @@ const LaporanKelasPage: React.FC = () => {
                 return acc;
             }, {});
 
-            if (Object.keys(problematicStudents).length === 0) caption += `(Nihil - Semua Hadir)\n`;
+            if (Object.keys(problematicStudents).length === 0) caption += `(Semua Hadir)\n`;
             else {
                 Object.entries(problematicStudents).sort((a,b) => a[0].localeCompare(b[0])).forEach(([name, counts]: [string, any], idx) => {
                     // Format count: "Alpa (2), Izin (1)"
