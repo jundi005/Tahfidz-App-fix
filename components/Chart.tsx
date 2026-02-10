@@ -180,47 +180,28 @@ export const StackedBarChart: React.FC<StackedBarChartProps> = ({
 );
 
 // KHUSUS UNTUK LAPORAN REKAP SANTRI (Banyak Data, Margin Bawah Besar, Bar Tebal)
-export const StudentStackedBarChart: React.FC<StackedBarChartProps> = ({ 
-    data, 
-    height = 500 
-}) => (
-  <ResponsiveContainer width="100%" height={height}>
-    <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 120 }}>
-      {/* Grid Horizontal Saja (Putus-putus) */}
-      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#cbd5e1" />
-      
-      {/* Sumbu X (Nama Santri) */}
+export const StudentStackedBarChart: React.FC<StackedBarChartProps> = ({ data }) => (
+  <ResponsiveContainer width="100%" height={400}>
+    <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+      <CartesianGrid strokeDasharray="3 3" vertical={false} />
       <XAxis 
         dataKey="name" 
-        interval={0} 
-        angle={-45}  
+        interval={0} // Force show all labels
+        angle={-45}  // Rotate labels to prevent overlap
         textAnchor="end"
-        height={120} 
-        tick={{fontSize: 11, fill: '#475569', fontWeight: 600, textAnchor: "end"}}
+        height={80}  // Increase height for rotated text
+        tick={{fontSize: 15, textAnchor: 'end'}}
         axisLine={false}
         tickLine={false}
-        // REMOVED manual dx/dy as requested, let textAnchor handle it
       />
-      
-      {/* Sumbu Y (Angka) */}
-      <YAxis 
-        axisLine={false} 
-        tickLine={false} 
-        tick={{fontSize: 11, fill: '#64748b'}} 
-      />
-      
-      <Tooltip 
-        cursor={{fill: '#f1f5f9'}} 
-        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-      />
-      <Legend verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}} iconType="circle"/>
-      
-      {/* Stacked Bars - Urutan: Hadir paling bawah */}
-      <Bar barSize={35} dataKey={AttendanceStatus.Hadir} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Hadir]} name="Hadir" radius={[0,0,0,0]} />
-      <Bar barSize={35} dataKey={AttendanceStatus.Izin} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Izin]} name="Izin" />
-      <Bar barSize={35} dataKey={AttendanceStatus.Sakit} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Sakit]} name="Sakit" />
-      <Bar barSize={35} dataKey={AttendanceStatus.Alpa} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Alpa]} name="Alpa" />
-      <Bar barSize={35} dataKey={AttendanceStatus.Terlambat} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Terlambat]} name="Terlambat" radius={[4,4,0,0]} />
+      <YAxis axisLine={false} tickLine={false} />
+      <Tooltip cursor={{fill: '#f1f5f9'}} />
+      <Legend verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}}/>
+      <Bar dataKey={AttendanceStatus.Hadir} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Hadir]} name="Hadir" />
+      <Bar dataKey={AttendanceStatus.Sakit} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Sakit]} name="Sakit" />
+      <Bar dataKey={AttendanceStatus.Izin} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Izin]} name="Izin" />
+      <Bar dataKey={AttendanceStatus.Alpa} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Alpa]} name="Alpa" />
+      <Bar dataKey={AttendanceStatus.Terlambat} stackId="a" fill={STATUS_COLORS[AttendanceStatus.Terlambat]} name="Terlambat" />
     </BarChart>
   </ResponsiveContainer>
 );
