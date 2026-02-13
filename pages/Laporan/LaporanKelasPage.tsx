@@ -133,7 +133,7 @@ const LaporanKelasPage: React.FC = () => {
             }
 
             let 
-            caption = `*LAPORAN ABSENSI HALAQAH AL-QUR'AN*\n\n`;
+            caption = `*LAPORAN ABSENSI HALAQAH AL-QUR'AN*\n`;
             caption += `Kelas: ${classItem.Kelas} (${classItem.Marhalah})\n`;
             caption += `Periode: ${periodStr}\n\n`;
             
