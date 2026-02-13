@@ -132,7 +132,8 @@ const LaporanKelasPage: React.FC = () => {
                 periodStr += ` s.d ${formatDateIndo(dateRange.end)}`;
             }
 
-            let caption = `*LAPORAN ABSENSI KELAS*\n`;
+            let 
+            caption = `*LAPORAN ABSENSI HALAQAH AL-QUR'AN*\n\n`;
             caption += `Kelas: ${classItem.Kelas} (${classItem.Marhalah})\n`;
             caption += `Periode: ${periodStr}\n\n`;
             
@@ -143,7 +144,7 @@ const LaporanKelasPage: React.FC = () => {
             caption += `Alpa: ${classItem.Alpa}\n`;
             caption += `Terlambat: ${classItem.Terlambat}\n\n`;
             
-            caption += `*Catatan*\n\n`;
+            caption += `*Catatan*\n`;
 
             // AGGREGATE ABSENCE COUNTS PER STUDENT
             const problematicStudents = filteredData.filter(r => 
